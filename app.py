@@ -1,22 +1,52 @@
-from flask import Flask
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, Field
+from typing import List
 
-app = Flask(__name__)
+app = FastAPI(title="Assignment API")
 
-@app.route('/')
-def home():
-    return {"message": "Assignment API is running successfully"}
+assignments_db = []
+current_id = 1
 
-@app.route('/api/hello')
-def hello():
-    return {"status": "success", "message": "Hello from Azumah4U"}
+class AssignmentCreate(BaseModel):
+    title: str = Field(..., min_length=3, max_length=100)
+    due_date: str
+    done: bool = False
 
-@app.route('/api/info')
-def info():
-    return {
-        "name": "Assignment-api",
-        "owner": "Azumah4U",
-        "version": "1.0"
+class Assignment(AssignmentCreate):
+    id: int
+
+@app.get("/assignments", response_model=List[Assignment])
+def get_all_assignments():
+    return assignments_db
+
+@app.get("/assignments/{assignment_id}", response_model=Assignment)
+def get_one_assignment(assignment_id: int):
+    for a in assignments_db:
+        if a["id"] == assignment_id:
+            return a
+    raise HTTPException(status_code=404, detail="Assignment not found")
+
+@app.post("/assignments", response_model=Assignment, status_code=201)
+def create_assignment(assignment: AssignmentCreate):
+    global current_id
+    new = {
+        "id": current_id,
+        "title": assignment.title,
+        "due_date": assignment.due_date,
+        "done": assignment.done
     }
+    assignments_db.append(new)
+    current_id += 1
+    return new
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+@app.delete("/assignments/{assignment_id}")
+def delete_assignment(assignment_id: int):
+    for a in assignments_db:
+        if a["id"] == assignment_id:
+            assignments_db.remove(a)
+            return {"message": "Assignment deleted"}
+    raise HTTPException(status_code=404, detail="Assignment not found")
+
+@app.get("/")
+def root():
+    return {"message": "Assignment API running. Go to /docs"}
